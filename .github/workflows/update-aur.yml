@@ -1,0 +1,63 @@
+name: Update AUR Package
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check upstream version
+        id: check
+        run: |
+          UPSTREAM=$(curl -s "https://pypi.org/pypi/browser-use/json" | jq -r '.info.version')
+          CURRENT=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)
+          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          if [ "$UPSTREAM" != "$CURRENT" ]; then
+            echo "update_needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "update_needed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update PKGBUILD version
+        if: steps.check.outputs.update_needed == 'true'
+        run: |
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.check.outputs.upstream }}/" PKGBUILD
+          sed -i 's/^pkgrel=.*/pkgrel=1/' PKGBUILD
+
+      - name: Update checksums and generate .SRCINFO
+        if: steps.check.outputs.update_needed == 'true'
+        uses: hapakaien/archlinux-package-action@v2
+        with:
+          updpkgsums: true
+          srcinfo: true
+
+      - name: Commit and push to GitHub
+        if: steps.check.outputs.update_needed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m "feat: update to ${{ steps.check.outputs.upstream }}"
+          git push
+
+      - name: Deploy to AUR
+        if: steps.check.outputs.update_needed == 'true'
+        uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
+        with:
+          pkgname: browser-use-cli
+          pkgbuild: ./PKGBUILD
+          assets: |
+            .SRCINFO
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ steps.check.outputs.upstream }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519

@@ -2,4 +2,5 @@ pkg/
 src/
 *.tar.*
 *.pkg.tar.*
+*.whl
 browser_use-*/

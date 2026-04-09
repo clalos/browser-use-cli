@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force AUR deploy even if versions match'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -29,13 +34,13 @@ jobs:
           fi
 
       - name: Update PKGBUILD version
-        if: steps.check.outputs.update_needed == 'true'
+        if: steps.check.outputs.update_needed == 'true' || inputs.force
         run: |
           sed -i "s/^pkgver=.*/pkgver=${{ steps.check.outputs.upstream }}/" PKGBUILD
           sed -i 's/^pkgrel=.*/pkgrel=1/' PKGBUILD
 
       - name: Update checksums and generate .SRCINFO
-        if: steps.check.outputs.update_needed == 'true'
+        if: steps.check.outputs.update_needed == 'true' || inputs.force
         uses: hapakaien/archlinux-package-action@v2
         with:
           path: .
@@ -45,7 +50,7 @@ jobs:
           srcinfo: true
 
       - name: Commit and push to GitHub
-        if: steps.check.outputs.update_needed == 'true'
+        if: steps.check.outputs.update_needed == 'true' || inputs.force
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -55,7 +60,7 @@ jobs:
           git push
 
       - name: Deploy to AUR
-        if: steps.check.outputs.update_needed == 'true'
+        if: steps.check.outputs.update_needed == 'true' || inputs.force
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.2
         with:
           pkgname: browser-use-cli

@@ -35,6 +35,7 @@ jobs:
         if: steps.check.outputs.update_needed == 'true'
         uses: hapakaien/archlinux-package-action@v2
         with:
+          path: .
           updpkgsums: true
           srcinfo: true
 

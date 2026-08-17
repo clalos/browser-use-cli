@@ -2,7 +2,7 @@
 
 pkgname=browser-use-cli
 _pyname=browser_use
-pkgver=0.13.7
+pkgver=0.13.8
 pkgrel=1
 pkgdesc='CLI for browser automation with AI agents'
 arch=(any)
@@ -68,7 +68,7 @@ noextract=(
   cdp_use-1.4.5-py3-none-any.whl
   browser_use_sdk-3.4.2-py3-none-any.whl
 )
-sha256sums=('02c27e154c4820b5e3e6606b30a666f11e203525fd051db4b9b515c35e2c2f0d'
+sha256sums=('2c868f099a66d8c33c0c346762d9b1c59e7254517bc900d3891e0b84767b977a'
             '254ae37cd9299941f5e9d6afb11f8e3ce069f83e5b9476f88c6b2e32912f237d'
             '8f8e2435e3a20e4009d2974144192cf3c132f6c2971338e156198814d9b91ecb'
             '1c6dac6e44f4ac4d552a3249d0282cb743d0d02bbadda093d78e599392c504d3')

@@ -35,6 +35,8 @@ Some Python dependencies are not available in the official Arch repos and may ne
 
 A [GitHub Actions workflow](.github/workflows/update-aur.yml) checks weekly for new upstream releases on PyPI and automatically syncs the PKGBUILD and pushes to AUR.
 
+Before anything is pushed, the workflow builds the package in an Arch Linux container, checks that every Python dependency declared by the built package is either bundled or listed in the PKGBUILD (`ci/check-deps.py`), and runs the installed CLI. The same checks run on every push and pull request. A build fails when upstream adds a dependency or bumps the pin of a bundled one, so those changes need a manual PKGBUILD update.
+
 ## Contributing
 
 Open issues and PRs on [GitHub](https://github.com/clalos/browser-use-cli). For package-specific discussion, see the [AUR comments](https://aur.archlinux.org/packages/browser-use-cli).

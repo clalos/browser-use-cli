@@ -58,9 +58,9 @@ makedepends=(
   python-setuptools
 )
 provides=(python-browser-use)
-# Every entry is a PyPI sdist that is built and installed below. The first one
-# is browser-use itself; the rest are runtime dependencies that are not
-# packaged in the official repositories or the AUR. Keep their versions in
+# Every .tar.gz entry is a PyPI sdist that is built and installed below. The
+# first one is browser-use itself; the rest are runtime dependencies that are
+# not packaged in the official repositories or the AUR. Keep their versions in
 # sync with the pins in upstream's pyproject.toml.
 source=(
   "https://files.pythonhosted.org/packages/source/${_pyname::1}/$_pyname/$_pyname-$pkgver.tar.gz"
@@ -77,27 +77,20 @@ sha256sums=('2c868f099a66d8c33c0c346762d9b1c59e7254517bc900d3891e0b84767b977a'
             '4fa7bfa1f973ecf7f054375878868b79ee096ad6f29dea0783397c730327ac1c'
             '9511987d4907ec6dac501e21d66946d10098f66b5d21bc2aba4189cd81ba189a')
 
-# Directory each sdist in source=() extracts to.
-_sdist_dirs() {
-  local _url
-  for _url in "${source[@]}"; do
-    _url=${_url##*/}
-    echo "${_url%.tar.gz}"
-  done
-}
-
 build() {
-  local _dir
-  for _dir in $(_sdist_dirs); do
-    cd "$srcdir/$_dir"
+  local _src
+  for _src in "${source[@]##*/}"; do
+    [[ $_src == *.tar.gz ]] || continue
+    cd "$srcdir/${_src%.tar.gz}"
     python -m build --wheel --no-isolation
   done
 }
 
 package() {
-  local _dir
-  for _dir in $(_sdist_dirs); do
-    python -m installer --destdir="$pkgdir" "$srcdir/$_dir"/dist/*.whl
+  local _src
+  for _src in "${source[@]##*/}"; do
+    [[ $_src == *.tar.gz ]] || continue
+    python -m installer --destdir="$pkgdir" "$srcdir/${_src%.tar.gz}"/dist/*.whl
   done
 
   install -Dm644 "$_pyname-$pkgver/LICENSE" -t "$pkgdir/usr/share/licenses/$pkgname"

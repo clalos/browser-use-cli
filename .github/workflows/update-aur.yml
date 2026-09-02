@@ -17,44 +17,11 @@ permissions:
   contents: write
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
-    outputs:
-      upstream: ${{ steps.check.outputs.upstream }}
-      bump: ${{ steps.check.outputs.bump }}
-      deploy: ${{ steps.check.outputs.deploy }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # Scheduled and manual runs follow upstream; pushes and pull requests
-      # only validate the checked-in PKGBUILD.
-      - name: Check upstream version
-        id: check
-        env:
-          FORCE: ${{ inputs.force }}
-        run: |
-          UPSTREAM=$(curl -s "https://pypi.org/pypi/browser-use/json" | jq -r '.info.version')
-          CURRENT=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)
-          BUMP=false
-          DEPLOY=false
-          case "$GITHUB_EVENT_NAME" in
-            schedule|workflow_dispatch)
-              [ "$UPSTREAM" != "$CURRENT" ] && BUMP=true
-              { [ "$BUMP" = true ] || [ "$FORCE" = true ]; } && DEPLOY=true
-              ;;
-          esac
-          echo "upstream=$UPSTREAM current=$CURRENT bump=$BUMP deploy=$DEPLOY"
-          {
-            echo "upstream=$UPSTREAM"
-            echo "bump=$BUMP"
-            echo "deploy=$DEPLOY"
-          } >> "$GITHUB_OUTPUT"
-
   build:
-    needs: check
     runs-on: ubuntu-latest
     container: archlinux:base-devel
+    outputs:
+      bump: ${{ steps.check.outputs.bump }}
     steps:
       - name: Install build tools
         run: |
@@ -68,35 +35,50 @@ jobs:
       - name: Hand workspace to build user
         run: chown -R builder:builder .
 
-      - name: Bump pkgver to upstream
-        if: needs.check.outputs.bump == 'true'
+      # Scheduled and manual runs follow upstream; pushes and pull requests
+      # only validate the checked-in PKGBUILD.
+      - name: Check upstream version
+        id: check
         run: |
-          sed -i "s/^pkgver=.*/pkgver=${{ needs.check.outputs.upstream }}/" PKGBUILD
+          BUMP=false
+          case "$GITHUB_EVENT_NAME" in
+            schedule|workflow_dispatch)
+              UPSTREAM=$(curl -s https://pypi.org/pypi/browser-use/json | python -c 'import json, sys; print(json.load(sys.stdin)["info"]["version"])')
+              CURRENT=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)
+              if [ "$UPSTREAM" != "$CURRENT" ]; then
+                BUMP=true
+              fi
+              echo "current=$CURRENT"
+              ;;
+          esac
+          { echo "upstream=$UPSTREAM"; echo "bump=$BUMP"; } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Bump pkgver to upstream
+        if: steps.check.outputs.bump == 'true'
+        run: |
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.check.outputs.upstream }}/" PKGBUILD
           sed -i 's/^pkgrel=.*/pkgrel=1/' PKGBUILD
           sudo -u builder -H updpkgsums
 
-      - name: Build AUR-only dependencies
+      - name: Build dependencies that are only in the AUR
         run: |
-          for pkg in python-uuid7 python-portalocker python-screeninfo; do
-            sudo -u builder -H git clone --depth 1 "https://aur.archlinux.org/$pkg.git" "/home/builder/$pkg"
-            sudo -u builder -H bash -c "cd /home/builder/$pkg && makepkg -si --noconfirm --nocheck"
+          for dep in $(sudo -u builder -H makepkg --printsrcinfo | sed -n 's/^\t\(make\)\?depends = //p' | sed 's/[<>=].*//'); do
+            pacman -Si "$dep" > /dev/null 2>&1 && continue
+            sudo -u builder -H git clone --depth 1 "https://aur.archlinux.org/$dep.git" "/home/builder/$dep"
+            sudo -u builder -H makepkg -D "/home/builder/$dep" -si --noconfirm --nocheck
           done
 
       - name: Build package
         run: |
           sudo -u builder -H makepkg -sf --noconfirm
-          cp .SRCINFO /tmp/SRCINFO.checked-in
           sudo -u builder -H makepkg --printsrcinfo > .SRCINFO
 
       - name: Check .SRCINFO is up to date
-        if: needs.check.outputs.bump != 'true'
-        run: diff -u /tmp/SRCINFO.checked-in .SRCINFO
+        if: steps.check.outputs.bump != 'true'
+        run: git diff --exit-code -- .SRCINFO
 
       - name: Check Python dependencies against PKGBUILD
-        run: |
-          mkdir -p /tmp/pkgroot
-          tar -xf browser-use-cli-*.pkg.tar.zst -C /tmp/pkgroot
-          python ci/check-deps.py /tmp/pkgroot .SRCINFO
+        run: python ci/check-deps.py pkg/browser-use-cli
 
       - name: Install and smoke test
         run: |
@@ -104,6 +86,7 @@ jobs:
           browser-use --help
 
       - name: Upload PKGBUILD and .SRCINFO
+        if: steps.check.outputs.bump == 'true' || inputs.force
         uses: actions/upload-artifact@v4
         with:
           name: pkgbuild
@@ -112,8 +95,8 @@ jobs:
             .SRCINFO
 
   deploy:
-    needs: [check, build]
-    if: needs.check.outputs.deploy == 'true'
+    needs: build
+    if: needs.build.outputs.bump == 'true' || inputs.force
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -129,14 +112,14 @@ jobs:
         run: |
           PKGVER=$(grep '^pkgver=' PKGBUILD | cut -d= -f2)
           PKGREL=$(grep '^pkgrel=' PKGBUILD | cut -d= -f2)
-          echo "full=$PKGVER-$PKGREL" >> "$GITHUB_OUTPUT"
+          { echo "pkgver=$PKGVER"; echo "full=$PKGVER-$PKGREL"; } | tee -a "$GITHUB_OUTPUT"
 
       - name: Commit and push to GitHub
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add PKGBUILD .SRCINFO
-          git diff --cached --quiet || git commit -m "feat: update to ${{ needs.check.outputs.upstream }}"
+          git diff --cached --quiet || git commit -m "feat: update to ${{ steps.version.outputs.pkgver }}"
           git push
 
       - name: Deploy to AUR

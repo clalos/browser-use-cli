@@ -77,7 +77,7 @@ jobs:
 
       - name: Build AUR-only dependencies
         run: |
-          for pkg in python-uuid7 python-portalocker; do
+          for pkg in python-uuid7 python-portalocker python-screeninfo; do
             sudo -u builder -H git clone --depth 1 "https://aur.archlinux.org/$pkg.git" "/home/builder/$pkg"
             sudo -u builder -H bash -c "cd /home/builder/$pkg && makepkg -si --noconfirm --nocheck"
           done

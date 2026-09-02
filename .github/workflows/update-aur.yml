@@ -75,7 +75,7 @@ jobs:
 
       - name: Check .SRCINFO is up to date
         if: steps.check.outputs.bump != 'true'
-        run: git diff --exit-code -- .SRCINFO
+        run: sudo -u builder -H git diff --exit-code -- .SRCINFO
 
       - name: Check Python dependencies against PKGBUILD
         run: python ci/check-deps.py pkg/browser-use-cli

@@ -77,12 +77,15 @@ sha256sums=('2c868f099a66d8c33c0c346762d9b1c59e7254517bc900d3891e0b84767b977a'
             '4fa7bfa1f973ecf7f054375878868b79ee096ad6f29dea0783397c730327ac1c'
             '9511987d4907ec6dac501e21d66946d10098f66b5d21bc2aba4189cd81ba189a')
 
+# Upstream pins exact versions of its build backends (hatchling, setuptools)
+# that rarely match the ones in the repositories. The pinned versions bring
+# nothing the packaged ones lack, so skip the check rather than fail on it.
 build() {
   local _src
   for _src in "${source[@]##*/}"; do
     [[ $_src == *.tar.gz ]] || continue
     cd "$srcdir/${_src%.tar.gz}"
-    python -m build --wheel --no-isolation
+    python -m build --wheel --skip-dependency-check --no-isolation
   done
 }
 

@@ -65,15 +65,9 @@ jobs:
           for dep in $(sudo -u builder -H makepkg --printsrcinfo | sed -n 's/^\t\(make\)\?depends = //p' | sed 's/[<>=].*//'); do
             pacman -Si "$dep" > /dev/null 2>&1 && continue
             sudo -u builder -H git clone --depth 1 "https://aur.archlinux.org/$dep.git" "/home/builder/$dep"
-            attempt=1
-            until sudo -u builder -H makepkg -D "/home/builder/$dep" -si --noconfirm --nocheck; do
-              if [ "$attempt" -ge 3 ]; then
-                exit 1
-              fi
-              echo "makepkg for $dep failed, retrying in 30s (attempt $attempt/3)"
-              attempt=$((attempt + 1))
-              sleep 30
-            done
+            # The legacy PyPI redirector is unreliable; Arch's Python packaging guidelines recommend files.pythonhosted.org
+            sudo -u builder -H sed -i 's|https://pypi\.python\.org/packages/|https://files.pythonhosted.org/packages/|; s|https://pypi\.io/packages/|https://files.pythonhosted.org/packages/|' "/home/builder/$dep/PKGBUILD"
+            sudo -u builder -H makepkg -D "/home/builder/$dep" -si --noconfirm --nocheck
           done
 
       - name: Build package

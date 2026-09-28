@@ -65,7 +65,15 @@ jobs:
           for dep in $(sudo -u builder -H makepkg --printsrcinfo | sed -n 's/^\t\(make\)\?depends = //p' | sed 's/[<>=].*//'); do
             pacman -Si "$dep" > /dev/null 2>&1 && continue
             sudo -u builder -H git clone --depth 1 "https://aur.archlinux.org/$dep.git" "/home/builder/$dep"
-            sudo -u builder -H makepkg -D "/home/builder/$dep" -si --noconfirm --nocheck
+            attempt=1
+            until sudo -u builder -H makepkg -D "/home/builder/$dep" -si --noconfirm --nocheck; do
+              if [ "$attempt" -ge 3 ]; then
+                exit 1
+              fi
+              echo "makepkg for $dep failed, retrying in 30s (attempt $attempt/3)"
+              attempt=$((attempt + 1))
+              sleep 30
+            done
           done
 
       - name: Build package

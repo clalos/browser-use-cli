@@ -67,6 +67,8 @@ jobs:
             sudo -u builder -H git clone --depth 1 "https://aur.archlinux.org/$dep.git" "/home/builder/$dep"
             # The legacy PyPI redirector is unreliable; Arch's Python packaging guidelines recommend files.pythonhosted.org
             sudo -u builder -H sed -i 's|https://pypi\.python\.org/packages/|https://files.pythonhosted.org/packages/|; s|https://pypi\.io/packages/|https://files.pythonhosted.org/packages/|' "/home/builder/$dep/PKGBUILD"
+            # Upstream sdists pin build backend versions the repos do not ship, so skip the check as the package's own build() does
+            sudo -u builder -H sed -i '/--skip-dependency-check/! s/python -m build/& --skip-dependency-check/' "/home/builder/$dep/PKGBUILD"
             sudo -u builder -H makepkg -D "/home/builder/$dep" -si --noconfirm --nocheck
           done
 

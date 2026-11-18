@@ -27,9 +27,9 @@ makepkg -si
 
 ## What it provides
 
-The package installs the `browser-use` CLI and its aliases (`browseruse`, `bu`, `browser`) for fast, persistent browser automation from the terminal.
+The package installs the `browser-use` CLI and its aliases (`browseruse`, and the deprecated `browser-use-tui`) for fast, persistent browser automation from the terminal.
 
-Some Python dependencies are not available in the official Arch repos and may need to be installed separately (via AUR or pip).
+The Python dependencies that are packaged in neither the official Arch repos nor the AUR (browser-harness, cdp-use, fetch-use, pydantic-ai-slim and pydantic-graph) are bundled in the package. One dependency, `python-uuid7`, comes from the AUR; an AUR helper installs it automatically.
 
 ## Updates
 
